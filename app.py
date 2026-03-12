@@ -13,37 +13,96 @@ st.set_page_config(
 # Custom CSS for premium feel
 st.markdown("""
     <style>
-    .main {
-        background-color: #f8f9fa;
+    /* Global Styles */
+    # .stApp {
+    #     background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    # }
+    
+    /* Card-like container for the main content */
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        max-width: 1000px;
     }
+
+    /* Primary Button Styling */
     .stButton>button {
         width: 100%;
-        border-radius: 5px;
-        height: 3em;
-        background-color: #007bff;
+        border-radius: 12px;
+        height: 3.5rem;
+        background: linear-gradient(90deg, #4b6cb7 0%, #182848 100%);
         color: white;
+        font-weight: 600;
+        border: none;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
+    .stButton>button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        color: #fff;
+        border: none;
+    }
+
+    /* Success/Download Button Styling */
     .stDownloadButton>button {
         width: 100%;
-        border-radius: 5px;
-        height: 3em;
-        background-color: #28a745;
+        border-radius: 12px;
+        height: 3.5rem;
+        background: linear-gradient(90deg, #11998e 0%, #38ef7d 100%);
         color: white;
+        font-weight: 600;
+        border: none;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .stDownloadButton>button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        color: #fff;
+    }
+
+    /* Sidebar Styling */
+    section[data-testid="stSidebar"] {
+        # background-color: #ffffff;
+        border-right: 1px solid #e0e0e0;
+    }
+    
+    /* Metrics Styling */
+    [data-testid="stMetricValue"] {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #182848;
     }
     </style>
     """, unsafe_allow_html=True)
 
 st.title("🖼️ JPEG to WebP Batch Converter")
-st.markdown("Optimize your images for the web in seconds.")
+st.markdown("##### Optimize your images for the web with professional-grade compression.")
+st.write("")
 
 # Sidebar Settings
 with st.sidebar:
-    st.header("Settings")
+    st.image("https://www.gstatic.com/images/branding/product/2x/photos_96dp.png", width=80) # Placeholder for professional look
+    st.header("Control Panel")
+    st.write("Adjust output settings below.")
     
-    quality = st.slider("Quality", min_value=0, max_value=100, value=80, help="0 is smallest size, 100 is best quality.")
+    quality_placeholder = st.empty()
     method = st.radio("Mode", ["Lossy", "Lossless"], index=0)
     lossless = (method == "Lossless")
     
+    with quality_placeholder:
+        quality = st.slider(
+            "Quality", 
+            min_value=0, max_value=100, value=80, 
+            help="0 is smallest size, 100 is best quality.",
+            disabled=lossless,
+            key="quality_slider"
+        )
+    
+    if lossless:
+        st.info("💡 **Note:** Quality slider is disabled in Lossless mode as it uses maximum compression compression effort.")
+
     st.divider()
     
     st.subheader("Resizing (Optional)")
@@ -55,10 +114,25 @@ with st.sidebar:
     preserve_exif = st.checkbox("Preserve EXIF Metadata", value=True)
 
 # Main Interface
-uploaded_files = st.file_uploader("Upload JPEG images", type=["jpg", "jpeg"], accept_multiple_files=True)
+uploaded_files = st.file_uploader(
+    "Upload JPEG images", 
+    type=["jpg", "jpeg"], 
+    accept_multiple_files=True,
+    help="Select one or more JPEG files to convert."
+)
 
 if uploaded_files:
-    st.info(f"Loaded {len(uploaded_files)} images.")
+    # Basic validation: ensure we only process JPEGs (Streamlit handles extension, but we can double check)
+    valid_files = [f for f in uploaded_files if f.name.lower().endswith(('.jpg', '.jpeg'))]
+    
+    if len(valid_files) < len(uploaded_files):
+        st.warning(f"⚠️ {len(uploaded_files) - len(valid_files)} file(s) were skipped because they are not JPEG format.")
+    
+    if not valid_files:
+        st.error("No valid JPEG files found.")
+        st.stop()
+
+    st.info(f"Loaded {len(valid_files)} images for processing.")
     
     converted_files = {}
     total_original_size = 0
@@ -70,7 +144,7 @@ if uploaded_files:
     
     # Results Container
     with st.expander("Show Conversion Results", expanded=True):
-        for i, uploaded_file in enumerate(uploaded_files):
+        for i, uploaded_file in enumerate(valid_files):
             # Read bytes
             file_bytes = uploaded_file.read()
             original_size = len(file_bytes)
@@ -83,40 +157,44 @@ if uploaded_files:
             res_w = target_width if target_width > 0 else None
             res_h = target_height if target_height > 0 else None
             
-            converted_bytes, new_size, new_dims = convert_to_webp(
-                file_bytes, 
-                quality=quality, 
-                lossless=lossless,
-                target_width=res_w,
-                target_height=res_h,
-                preserve_exif=preserve_exif
-            )
-            
-            total_converted_size += new_size
-            new_filename = uploaded_file.name.rsplit('.', 1)[0] + ".webp"
-            converted_files[new_filename] = converted_bytes
-            
-            # Display per-file stats
-            col1, col2, col3 = st.columns([2, 1, 1])
-            with col1:
-                st.write(f"**{uploaded_file.name}** → {new_filename}")
-            with col2:
-                savings = (1 - (new_size / original_size)) * 100
-                st.write(f"Size: {original_size/1024:.1f}KB → {new_size/1024:.1f}KB")
-            with col3:
-                st.write(f"**{savings:.1f}% saved**")
-            
-            # Preview Toggle
-            if st.checkbox(f"Show Preview for {uploaded_file.name}", key=f"prev_{uploaded_file.name}"):
-                p_col1, p_col2 = st.columns(2)
-                with p_col1:
-                    st.image(file_bytes, caption="Original (JPEG)", use_container_width=True)
-                with p_col2:
-                    st.image(converted_bytes, caption="Converted (WebP)", use_container_width=True)
-                st.divider()
+            try:
+                converted_bytes, new_size, new_dims = convert_to_webp(
+                    file_bytes, 
+                    quality=quality, 
+                    lossless=lossless,
+                    target_width=res_w,
+                    target_height=res_h,
+                    preserve_exif=preserve_exif
+                )
+                
+                total_converted_size += new_size
+                new_filename = uploaded_file.name.rsplit('.', 1)[0] + ".webp"
+                converted_files[new_filename] = converted_bytes
+                
+                # Display per-file stats
+                col1, col2, col3 = st.columns([2, 1, 1])
+                with col1:
+                    st.write(f"**{uploaded_file.name}** → {new_filename}")
+                with col2:
+                    savings = (1 - (new_size / original_size)) * 100
+                    st.write(f"Size: {original_size/1024:.1f}KB → {new_size/1024:.1f}KB")
+                with col3:
+                    st.write(f"**{savings:.1f}% saved**")
+                
+                # Preview Toggle
+                if st.checkbox(f"Show Preview for {uploaded_file.name}", key=f"prev_{uploaded_file.name}"):
+                    p_col1, p_col2 = st.columns(2)
+                    with p_col1:
+                        st.image(file_bytes, caption="Original (JPEG)", use_container_width=True)
+                    with p_col2:
+                        st.image(converted_bytes, caption="Converted (WebP)", use_container_width=True)
+                    st.divider()
+            except Exception as e:
+                st.error(f"Error converting {uploaded_file.name}: {str(e)}")
+                continue
                 
             # Update progress
-            progress_bar.progress((i + 1) / len(uploaded_files))
+            progress_bar.progress((i + 1) / len(valid_files))
             
     status_text.text("Batch processing complete!")
     
