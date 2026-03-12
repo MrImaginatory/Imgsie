@@ -114,25 +114,35 @@ with st.sidebar:
     preserve_exif = st.checkbox("Preserve EXIF Metadata", value=True)
 
 # Main Interface
+st.subheader("📤 Upload Queue")
 uploaded_files = st.file_uploader(
-    "Upload JPEG images", 
+    "Choose JPEG files", 
     type=["jpg", "jpeg"], 
     accept_multiple_files=True,
-    help="Select one or more JPEG files to convert."
+    help="Drag and drop or click to upload one or more JPEG files."
 )
 
 if uploaded_files:
-    # Basic validation: ensure we only process JPEGs (Streamlit handles extension, but we can double check)
-    valid_files = [f for f in uploaded_files if f.name.lower().endswith(('.jpg', '.jpeg'))]
+    # Validation and Stats
+    valid_files = []
+    skipped_files = []
     
-    if len(valid_files) < len(uploaded_files):
-        st.warning(f"⚠️ {len(uploaded_files) - len(valid_files)} file(s) were skipped because they are not JPEG format.")
+    for f in uploaded_files:
+        if f.name.lower().endswith(('.jpg', '.jpeg')):
+            valid_files.append(f)
+        else:
+            skipped_files.append(f.name)
+    
+    if skipped_files:
+        st.warning(f"⚠️ Skipping {len(skipped_files)} unsupported file(s): {', '.join(skipped_files)}")
     
     if not valid_files:
-        st.error("No valid JPEG files found.")
+        if uploaded_files:
+            st.error("No valid JPEG files detected in the selection.")
         st.stop()
 
-    st.info(f"Loaded {len(valid_files)} images for processing.")
+    # Success message with better count
+    st.success(f"Successfully staged **{len(valid_files)}** JPEG images for conversion.")
     
     converted_files = {}
     total_original_size = 0
